@@ -1,0 +1,132 @@
+~Difficulty: Advanced~
+
+* TL;DR
+If you're not sure what you're doing and you trust your synthesis
+tools enough to do the right thing, do this (gate your write-enables
+with the clock-enable):
+
+#+BEGIN_SRC systemverilog
+always_ff @(posedge clk)
+  if (clk_en)
+    // gated logic goes here
+#+END_SRC
+
+Do *not* put logic assigning to a single variable both inside and
+outside of that if-statement:
+
+#+BEGIN_SRC systemverilog
+always_ff @(posedge clk)
+  if (clk_en)
+    q <= d;
+  else
+    q <= 0;
+#+END_SRC
+
+* Clock Gating
+Clock gating is a technique commonly used to prevent large portions of
+a design from being active.  There are a variety of reasons you may
+want to do this, like to stall a design or to save power.
+
+The reason this is called clock gating is because you gate the clock
+with the clock-enable.
+#+BEGIN_SRC systemverilog
+assign clk_gated = clk & clk_en;
+#+END_SRC
+
+If clock-enable is a registered value clocked on the clock, just doing
+the above can cause *huge* amounts of difficult to trace errors. There
+is additional work that /must/ be done to the clock-enable to prepare
+it for correctly gating the clock.
+
+To illustrate the problem, we can look at a few illustrative
+waveforms.
+
+Most simulators will give you a waveform that looks like the
+following:
+
+#+BEGIN_SRC wavedrom :file media/clock-gating/simulation.svg :exports results
+{signal: [
+  {name: 'clk', period: 2, wave: 'p...'},
+  {name: 'clk_en', wave: 'l.h.....'},
+  {name: 'clk_gated', wave: 'l.hlhlhl'},
+]}
+#+END_SRC
+
+#+RESULTS:
+[[file:media/clock-gating/simulation.svg]]
+
+At first glance, this doesn't seem /wrong/, but this is far more
+sinister than it seems.  Because the clock-enable is registered on the
+clock, its value was 0 when the positive edge occurred, so we
+shouldn't have the gated clock starting just yet. If we add in the
+clock-to-Q and gate propagation delay, it would really look something
+more like the following:
+
+#+BEGIN_SRC wavedrom :file media/clock-gating/deay.svg :exports results
+{signal: [
+  {name: 'clk', period: 2, wave: 'p...'},
+  {name: 'clk_en', wave: 'l.1.....'},
+  {name: 'clk_gated', wave: 'l.1lhlhl'},
+]}
+#+END_SRC
+
+#+RESULTS:
+[[file:media/clock-gating/deay.svg]]
+
+The output we actually want to see looks more like this:
+
+#+BEGIN_SRC wavedrom :file media/clock-gating/expected.svg :exports results
+{signal: [
+  {name: 'clk', period: 2, wave: 'p...'},
+  {name: 'clk_en', wave: 'l.1.....'},
+  {name: 'clk_gated', wave: 'l...hlhl'},
+]}
+#+END_SRC
+
+#+RESULTS:
+[[file:media/clock-gating/expected.svg]]
+
+You might be tempted to use a register triggered on the negative edge
+of the clock, but this raises other problems.  You would be restricted
+to capturing clock-enables that happen soon after the positive edge of
+the clock with a small propagation delay, otherwise you will catch it
+the next cycle, which is probably not what you want.  If you used a
+register, you would also burn more power since this register could not
+be clock gated.
+
+#+BEGIN_SRC wavedrom :file media/clock-gating/late-register.svg :exports results
+{signal: [
+  {name: 'clk', period: 2, wave: 'p...'},
+  {name: 'clk_en', wave: 'l..1....'},
+  {name: 'clk_gated', wave: 'l.....hl'},
+]}
+#+END_SRC
+
+#+RESULTS:
+[[file:media/clock-gating/late-register.svg]]
+
+** The Solution
+What we really need is a *latch* (not a register) that is transparent
+while the clock is high, but captures the clock-enable while the clock
+is low. Standard cells for clock gating typically include a latch as
+well as the and-gate necessary.
+
+You may have been told that latches should be avoided at all costs and
+if you have latches in your design then you should get rid of
+them. This is one of the few exceptions.
+
+#+BEGIN_SRC systemverilog
+always_latch
+  if (~clk)
+    clk_en_latched <= clk_en;
+
+assign clk_gated = clk & clk_en_latched;
+
+always_ff @(posedge clk_gated)
+  // gated logic goes here
+#+END_SRC
+
+* COMMENT Local Variables
+# Local Variables:
+# org-confirm-babel-evaluate: (lambda (lang body) (not (string= lang "wavedrom")))
+# End:
