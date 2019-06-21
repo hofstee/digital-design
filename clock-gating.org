@@ -72,7 +72,7 @@ shouldn't have the gated clock starting just yet. If we add in the
 clock-to-Q and gate propagation delay, it would really look something
 more like the following:
 
-#+BEGIN_SRC wavedrom :file media/clock-gating/deay.svg :exports results
+#+BEGIN_SRC wavedrom :file media/clock-gating/delay.svg :exports results
 {signal: [
   {name: 'clk', period: 2, wave: 'p...'},
   {name: 'clk_en', wave: 'l.1.....'},
@@ -81,7 +81,7 @@ more like the following:
 #+END_SRC
 
 #+RESULTS:
-[[file:media/clock-gating/deay.svg]]
+[[file:media/clock-gating/delay.svg]]
 
 The output we actually want to see looks more like this:
 
