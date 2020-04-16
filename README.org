@@ -1,0 +1,6 @@
+These are mostly some personal notes related to digital
+design. If there's a topic you'd like me to cover, file an issue
+and I'll see what I can do about it.
+
+* Contents
+- [[clock-gating.org][Clock Gating]]
